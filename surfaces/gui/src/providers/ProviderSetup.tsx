@@ -326,7 +326,7 @@ export function ProviderForm({
   const input =
     "w-full px-3 py-2 rounded-lg border bg-panel text-[13.5px] outline-none focus:border-accent";
   const fieldsAll = info?.fields || [];
-  const keyed = fieldsAll.some((x) => x.secret);
+  const keyed = !!info?.needs_key;
   // Cloud providers declare a segmented auth-method choice; the selected method's
   // credential fields render inside a panel with its own Test & save footer.
   const choice = fieldsAll.find((f) => f.choices && f.choices.length);
@@ -339,10 +339,10 @@ export function ProviderForm({
           Object.entries(f.show_when).every(([k, v]) => (ps.fields[k] || "") === v),
       )
     : [];
-  // Without a choice control, Test lives next to the required secret (the API key), or
-  // the first field for keyless providers (Ollama's Detect).
-  const requiredSecret = fieldsAll.find((x) => x.secret && x.required);
-  const testKey = requiredSecret ? requiredSecret.key : fieldsAll[0]?.key;
+  // Without a choice control, Test lives next to the secret (the API key), or
+  // the first field for keyless providers.
+  const secret = fieldsAll.find((x) => x.secret);
+  const testKey = secret ? secret.key : fieldsAll[0]?.key;
   if (!sel) return null;
 
   const fieldRow = (f: ProviderFieldT, testable: boolean) => (
@@ -502,7 +502,8 @@ export function ProviderForm({
       )}
       {info && !info.needs_key && (
         <p className="text-[11.5px] text-faint mt-2">
-          No API key needed — Ollama runs models on this computer.{" "}
+          No API key needed — Ollama runs models on this computer. Add one only if your local
+          server requires auth.{" "}
           <button
             className="text-muted underline decoration-line underline-offset-2 hover:text-ink"
             onClick={() => openExternal("https://ollama.com/download")}
@@ -516,7 +517,7 @@ export function ProviderForm({
           with enough separation to read as its own advanced row — no explainer copy
           (owner calls 2026-07-18 + 2026-07-19). */}
       {(() => {
-        const keyed = (info?.fields || []).some((x) => x.secret);
+        const keyed = !!info?.needs_key;
         const ep = keyed ? (info?.fields || []).find((f) => f.key === "base_url") : undefined;
         if (!ep) return null;
         if (!ps.showEndpoint)
