@@ -166,6 +166,9 @@ class SessionManager:
         # feeds list_mcp's status so the GUI can show "authorizing…" and failures.
         self._mcp_authorizing: set[str] = set()
         self._mcp_errors: dict[str, str] = {}
+        # Servers that failed to connect while preparing a session's tools —
+        # drained once by the WS handler to append a transcript notice.
+        self._mcp_session_failures: dict[str, list[str]] = {}
         self.gateway: Optional[Gateway] = None
         self._data_base = base
         # Desktop/UI prefs (default model, onboarding state) — not secrets; a plain JSON file.
@@ -957,6 +960,7 @@ class SessionManager:
                 ]
             try:
                 conn = await self.mcp.ensure(server)
+                self._mcp_errors.pop(server.name, None)
             except Exception as exc:
                 if mcp_oauth.is_auth_required(exc):
                     # Stored tokens no longer refresh (vendor rotated/expired
@@ -969,7 +973,22 @@ class SessionManager:
                     logger.info(
                         "mcp %s needs re-auth; skipped for this session", server.name
                     )
-                # else: bad command / unreachable url — skip, don't break the session
+                else:
+                    # Bad command / crashed child / unreachable url — the session
+                    # still runs without the tools, but the failure must not be
+                    # silent (three-for-three silent failures in the 2026-08-20
+                    # drill): record it for the MCP page and the session notice.
+                    msg = str(exc) or exc.__class__.__name__
+                    tail = self.mcp.last_stderr(server.name)
+                    if tail:
+                        msg = f"{msg} — {tail}"
+                    self._mcp_errors[server.name] = msg[:500]
+                    logger.warning(
+                        "mcp %s failed to connect: %s", server.name, msg[:500]
+                    )
+                self._mcp_session_failures.setdefault(session_id, []).append(
+                    server.name
+                )
                 continue
             callables = build_callables(
                 server,
@@ -987,6 +1006,12 @@ class SessionManager:
                     )
             out.extend(callables)
         return out
+
+    def pop_mcp_failures(self, session_id: str) -> list[tuple[str, Optional[str]]]:
+        """Drain (name, error) for servers that failed while preparing this session's
+        tools — consumed once by the WS handler to append a transcript notice."""
+        names = self._mcp_session_failures.pop(session_id, [])
+        return [(n, self._mcp_errors.get(n)) for n in names]
 
     def list_mcp(self) -> list[dict[str, Any]]:
         """Servers from the global config + connection status (does not connect)."""
@@ -1011,6 +1036,12 @@ class SessionManager:
                 status = "authorizing"
             elif is_oauth and not mcp_oauth.has_tokens(name, self.secrets):
                 status = "needs_auth"
+            elif name in self._mcp_errors and not is_oauth:
+                # Startup/connection failure (stdio crash, unreachable url) — the
+                # drill class. OAuth servers keep their softer statuses: acquiring
+                # tokens supersedes a stale sign-in error (the GUI still prints
+                # last_error under the row either way).
+                status = "error"
             else:
                 status = "configured"
             out.append(

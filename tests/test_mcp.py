@@ -254,3 +254,61 @@ def test_rest_crud(tmp_path, monkeypatch):
     assert client.delete("/v1/mcp/fs").json()["ok"] is True
     assert client.get("/v1/mcp").json()["servers"] == []
     assert client.delete("/v1/mcp/fs").json()["ok"] is False
+
+
+# -- failure surfacing (drill 2026-08-20: silent startup crashes) ----------------
+
+
+@pytest.mark.asyncio
+async def test_stdio_startup_crash_captures_stderr_tail(tmp_path, monkeypatch):
+    """A stdio server that dies before initialize leaves its stderr tail behind."""
+    from coworker.mcp.client import MCPManager
+
+    mgr = MCPManager()
+    server = MCPServerDef(
+        name="doomed",
+        transport="stdio",
+        command="/bin/sh",
+        args=["-c", "echo 'usage: doomed --flag' >&2; exit 7"],
+    )
+    with pytest.raises(Exception):
+        await mgr.ensure(server)
+    tail = mgr.last_stderr("doomed")
+    assert tail is not None and "usage: doomed --flag" in tail
+
+
+@pytest.mark.asyncio
+async def test_prepare_records_failure_status_and_session_notice(
+    tmp_path, monkeypatch
+):
+    """A crashing global server surfaces: last_error + status=error + one-shot
+    session failure drain — instead of the pre-drill silent skip."""
+    monkeypatch.setenv("COWORKER_STATE_DIR", str(tmp_path / "state"))
+    _write_json(
+        tmp_path / "state" / "mcp.json",
+        {
+            "mcpServers": {
+                "sales-db": {
+                    "command": "/bin/sh",
+                    "args": ["-c", "echo 'boom: bad args' >&2; exit 2"],
+                    "enabled": True,
+                }
+            }
+        },
+    )
+    manager = SessionManager(data_dir=tmp_path / "data")
+
+    tools = await manager.prepare_mcp_tools("s1", workspace=str(tmp_path / "wsp"))
+    assert tools == []
+
+    err = manager._mcp_errors.get("sales-db")
+    assert err and "boom: bad args" in err
+
+    listed = {s["name"]: s for s in manager.list_mcp()}
+    assert listed["sales-db"]["status"] == "error"
+    assert "boom: bad args" in (listed["sales-db"]["last_error"] or "")
+
+    drained = manager.pop_mcp_failures("s1")
+    assert [n for n, _ in drained] == ["sales-db"]
+    assert "boom: bad args" in (drained[0][1] or "")
+    assert manager.pop_mcp_failures("s1") == []  # one-shot

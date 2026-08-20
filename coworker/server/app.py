@@ -1815,6 +1815,16 @@ def create_app(manager: SessionManager) -> FastAPI:
             )
             await ws.close()
             return
+        # MCP servers that failed to start while preparing this session's tools:
+        # leave a quiet, persistent notice instead of the session silently lacking
+        # them (drill 2026-08-20: three silent startup failures in a row).
+        for name, err in manager.pop_mcp_failures(session_id):
+            detail = f": {err}" if err else ""
+            engine._append_notice(
+                "mcp_error",
+                f"MCP server “{name}” failed to start{detail}"[:300]
+                + " — see Settings ▸ MCP",
+            )
         # Auto-compaction failure prompt (OPE-27): only an ATTENDED session may be asked
         # Retry/Trim — unattended runs auto-trim (the policy in engine._compact_now).
         engine.is_attended = lambda: _visibility() == VIS_INLINE
