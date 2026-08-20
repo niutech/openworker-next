@@ -184,9 +184,11 @@ def _build_vertex(profile: dict[str, Any], secrets: Any) -> ProviderClient:
 def _build_ollama(profile: dict[str, Any], secrets: Any) -> ProviderClient:
     # Stock Ollama ignores the key but the SDK requires a non-empty string, so we fall back to
     # a placeholder. An optional stored key is passed through for local OpenAI-compatible
-    # servers that DO authenticate (oMLX, a gated proxy in front of `ollama serve`).
-    # `base_url` comes from the stored profile (or the default).
-    base_url = _normalize_ollama_url((profile or {}).get("base_url"))
+    # servers that do authenticate (e.g. oMLX). `base_url` is the selected endpoint
+    # (mirrored onto the legacy profile field for backward compatibility)
+    from . import ollama_endpoints as ollama_ep
+
+    base_url = _normalize_ollama_url(ollama_ep.selected_base_url(profile) or DEFAULT_OLLAMA_URL)
     api_key = ((profile or {}).get("api_key") or "").strip() or "ollama"
     return OpenAIProvider(api_key=api_key, base_url=base_url)
 
@@ -670,7 +672,7 @@ DESCRIPTORS: list[ProviderDescriptor] = [
                 secret=False,
                 required=False,
                 placeholder=DEFAULT_OLLAMA_URL,
-                help="Where `ollama serve` is listening. The OpenAI-compatible /v1 path is added automatically.",
+                help="Selected endpoint URL (mirrored). Prefer the Endpoints list in Settings to manage multiple hosts. The OpenAI-compatible /v1 path is added automatically.",
             ),
             ProviderField(
                 "api_key",
