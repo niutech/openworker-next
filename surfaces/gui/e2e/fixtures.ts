@@ -347,7 +347,7 @@ const PROVIDERS = [
   // ollama: keyless local provider — "configured" without proving anything runs; the
   // onboarding gallery shows "No key needed". Multi-endpoint list starts empty so the
   // Settings form shows the add-endpoint UI.
-  { name: "ollama", title: "Ollama (local models)", needs_key: false, fields: [{ key: "base_url", label: "Endpoint", secret: false, required: false, help: "", placeholder: "http://127.0.0.1:11434", default: "http://127.0.0.1:11434" }], configured: true, values: {}, suggested_models: ["qwen3-coder:30b"], key_set_at: null, last_used_at: null, endpoints: [] as any[], selected_endpoint_id: null as string | null },
+  { name: "ollama", title: "Ollama (local models)", needs_key: false, fields: [{ key: "base_url", label: "Endpoint", secret: false, required: false, help: "", placeholder: "http://127.0.0.1:11434", default: "http://127.0.0.1:11434" }, { key: "api_key", label: "API key (optional)", secret: true, required: false, help: "Only for local OpenAI-compatible servers that require auth.", placeholder: "", default: "" }], configured: true, values: {}, suggested_models: ["qwen3-coder:30b"], key_set_at: null, last_used_at: null, endpoints: [] as any[], selected_endpoint_id: null as string | null },
 ];
 
 /** Install the API + WebSocket mocks on a page. Returns handles for assertions/seed data. */

@@ -80,3 +80,22 @@ test("ollama endpoints: add, select, and persist a local URL", async ({ page }) 
   await expect(page.getByText("http://127.0.0.1:9999")).toBeVisible();
   await expect(page.getByTestId("set-ollama-selected-badge")).toBeVisible();
 });
+
+test("a keyless provider's optional key does not take over the form (ollama)", async ({
+  page,
+}) => {
+  // Ollama offers an optional key for local servers behind auth (oMLX, a gated proxy).
+  // That must not turn it into a "keyed" provider: the endpoint stays inline (not hidden
+  // behind the Custom endpoint disclosure) and keeps the Detect button, which stays
+  // enabled while the optional key is empty.
+  await openModels(page);
+  await page.getByTestId("set-provider-ollama").click();
+
+  await expect(page.getByTestId("set-field-base_url")).toBeVisible();
+  await expect(page.getByTestId("set-field-api_key")).toBeVisible();
+  await expect(page.getByTestId("set-endpoint-link")).toHaveCount(0);
+
+  const detect = page.getByTestId("set-test");
+  await expect(detect).toBeEnabled();
+  await expect(detect).toHaveText("Detect");
+});
