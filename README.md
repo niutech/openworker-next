@@ -1,8 +1,6 @@
-# OpenWorker
+# OpenWorker Next
 
-**[openworker.com](https://openworker.com)** · [Download](#download) · [Issues](https://github.com/andrewyng/openworker/issues)
-
-<a href="https://trendshift.io/repositories/91434?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-91434" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/91434/daily?language=Python" alt="andrewyng%2Fopenworker | Trendshift" width="250" height="55"/></a>
+**This is a fork of [OpenWorker](https://github.com/andrewyng/openworker) with many features added: Linux DEB/AppImage builds, i18n support, multiple Ollama endpoints, optional Ollama API keys, NVIDIA NIM provider and more.**
 
 > **Beta** - OpenWorker is in open beta: fully usable, updates itself, and we're actively polishing rough edges. [Issues](https://github.com/andrewyng/openworker/issues) welcome.
 
