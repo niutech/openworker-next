@@ -113,6 +113,21 @@ def is_auth_required(exc: BaseException) -> bool:
     return is_auth_required(cause) if cause is not None else False
 
 
+def is_http_auth_error(exc: BaseException) -> bool:
+    """True if an HTTP 401/403 is anywhere in the exception tree — an anonymous
+    connect hit a server that wants credentials, so the fix is sign-in (switch
+    the entry to `auth: oauth`), not a different config. Same tree walk as
+    is_auth_required: the transport's task groups wrap and chain freely."""
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status in (401, 403):
+        return True
+    for sub in getattr(exc, "exceptions", None) or []:  # ExceptionGroup
+        if is_http_auth_error(sub):
+            return True
+    cause = exc.__cause__ or exc.__context__
+    return is_http_auth_error(cause) if cause is not None else False
+
+
 # -- single-slot interactive flow ------------------------------------------------
 _pending: Optional[asyncio.Future] = None
 # The last authorize URL we sent the user to — surfaced over REST so the GUI can offer
